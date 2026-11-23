@@ -87,7 +87,7 @@ import {
   trustedNetworkLauncher,
 } from "./agent-users";
 import { AgyCopy, type AgyCopyOptions } from "./agy-copy";
-import { BrainManager, readyRoom } from "./brain";
+import { BrainManager, OWNER_SETTINGS_ENV, readyRoom } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
@@ -1336,6 +1336,7 @@ export class RunnerDaemon implements RequestObserver {
       claudeVersion: () => this.executors().claude?.version ?? null,
       // Single-user mode only: in system mode each agent is its own user, and the shared bin/ stays off every PATH.
       sharedFolder: () => (this.session?.agentUser != null ? null : this.shared),
+      ownerSettings: () => this.session?.agentUser == null && process.env[OWNER_SETTINGS_ENV] === "1",
       readyRoom,
       log,
     });

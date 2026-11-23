@@ -1386,6 +1386,30 @@ test.if(posix)(
   },
 );
 
+test.if(posix)("ownerSettings: work turns load the owner's own Claude Code; chat and plan stay locked", async () => {
+  const { spawns, turn } = setup({ ownerSettings: () => true });
+  await turn(1, "do");
+  const work = spawns()[0]?.args ?? [];
+  expect(work).not.toContain("--setting-sources");
+  expect(work).not.toContain("--strict-mcp-config");
+  expect(work).not.toContain("--tools");
+  expect(work).toContain("--permission-prompt-tool");
+  await turn(2, "look", { permissions: { mode: "plan" } as BrainTurnRequest["permissions"] });
+  const plan = spawns()[1]?.args ?? [];
+  expect(plan[plan.indexOf("--setting-sources") + 1]).toBe("");
+  expect(plan).toContain("--strict-mcp-config");
+  await turn(3, "hi", { permissions: { mode: "chat", allow: [] } as unknown as BrainTurnRequest["permissions"] });
+  const chat = spawns()[2]?.args ?? [];
+  expect(chat[chat.indexOf("--setting-sources") + 1]).toBe("");
+  expect(chat).toContain("--strict-mcp-config");
+  // Off by default.
+  const off = setup();
+  await off.turn(1, "do");
+  const isolated = off.spawns()[0]?.args ?? [];
+  expect(isolated[isolated.indexOf("--setting-sources") + 1]).toBe("");
+  expect(isolated).toContain("--strict-mcp-config");
+});
+
 test.if(posix)("plan limit and login failures end the turn with retryable errors", async () => {
   const { turn } = setup();
   const lim = await turn(1, "LIMIT");

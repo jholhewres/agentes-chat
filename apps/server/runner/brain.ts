@@ -952,6 +952,8 @@ const REFUSED_CONTROL = "Not allowed with this sign-in.";
  */
 const REFUSED_ELICITATION =
   "Not allowed with this sign-in, and nobody was shown the form it wanted: ask the person for it in the thread yourself.";
+/** Opt-in, single-user mode only: `1` gives every agent's work turn the owner's own Claude Code (`ownerSettings`). */
+export const OWNER_SETTINGS_ENV = "AGENTES_CLAUDE_USE_USER_SETTINGS";
 export const PERSONAL_MCP_REFUSED =
   "Your own MCP servers don't work with this Claude sign-in. Turn them off for this agent or use another sign-in.";
 
@@ -2070,6 +2072,11 @@ export interface BrainManagerOptions {
   sharedFolder?: () => string | null | undefined;
   /** How Claude Code starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
   spawn?: Spawn;
+  /**
+   * Every work turn loads the computer owner's own Claude Code, as with `personalMcp`: settings, CLAUDE.md, skills,
+   * plugins, hooks and MCP servers (`OWNER_SETTINGS_ENV`). Never a `chat` or `plan` turn, nor a shared sign-in's.
+   */
+  ownerSettings?: () => boolean;
   /** How long a process may sit between turns, in time the computer was awake (`AwakeClock`). */
   idleMs?: number;
   maxProcesses?: number;
@@ -2557,6 +2564,7 @@ export class BrainManager {
     if (typeof req.session?.id !== "string" || !SESSION_ID.test(req.session.id))
       throw new RunnerError("bad_request", "The session must be a UUID");
     if (typeof req.prompt !== "string" || !req.prompt.trim()) throw new RunnerError("bad_request", "Empty prompt");
+    req = this.withOwnerSettings(req, ctx);
     const at = await this.place(req, ctx);
     if ("type" in at) return at;
     if (!at.ctx.delegated && req.keepAlive !== false) {
@@ -2566,6 +2574,13 @@ export class BrainManager {
       at.session = this.adoptReady(at.ctx.agent.id, at.session, sig, system, fresh) ?? at.session;
     }
     return this.queueTurn(at.session, at.cwd, req, at.ctx);
+  }
+
+  /** `ownerSettings`: a work turn asks for the owner's own Claude Code (`personalMcp`), so a warm start matches it. */
+  private withOwnerSettings<R extends BrainWarmRequest>(req: R, ctx: BrainTurnContext): R {
+    const mode = req.permissions?.mode;
+    if (ctx.delegated || mode === "chat" || mode === "plan" || !this.opts.ownerSettings?.()) return req;
+    return { ...req, personalMcp: true };
   }
 
   /** Where a turn (or a warm start) of `req` runs: its session, folder and sign-in; an event when it can't. */
@@ -2644,6 +2659,7 @@ export class BrainManager {
     const no: BrainWarmReply = { open: false, started: false };
     const system = this.systems.get(ctx.agent.id);
     if (this.closed || req.kind !== "claude_code" || ctx.delegated || system === undefined) return no;
+    req = this.withOwnerSettings(req, ctx);
     const at = await this.place(req, ctx).catch(() => null);
     if (!at || "type" in at) return no;
     // The agent's folder asked: where its last turn ran instead (a checkout the engine moves its turns to), if still
