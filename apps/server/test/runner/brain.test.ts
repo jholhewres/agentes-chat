@@ -1394,6 +1394,7 @@ test.if(posix)("ownerSettings: work turns load the owner's own Claude Code; chat
   expect(work).not.toContain("--strict-mcp-config");
   expect(work).not.toContain("--tools");
   expect(work).toContain("--permission-prompt-tool");
+  expect(work).toContain("--chrome");
   await turn(2, "look", { permissions: { mode: "plan" } as BrainTurnRequest["permissions"] });
   const plan = spawns()[1]?.args ?? [];
   expect(plan[plan.indexOf("--setting-sources") + 1]).toBe("");
@@ -1402,12 +1403,14 @@ test.if(posix)("ownerSettings: work turns load the owner's own Claude Code; chat
   const chat = spawns()[2]?.args ?? [];
   expect(chat[chat.indexOf("--setting-sources") + 1]).toBe("");
   expect(chat).toContain("--strict-mcp-config");
+  expect([...plan, ...chat]).not.toContain("--chrome");
   // Off by default.
   const off = setup();
   await off.turn(1, "do");
   const isolated = off.spawns()[0]?.args ?? [];
   expect(isolated[isolated.indexOf("--setting-sources") + 1]).toBe("");
   expect(isolated).toContain("--strict-mcp-config");
+  expect(isolated).not.toContain("--chrome");
 });
 
 test.if(posix)("plan limit and login failures end the turn with retryable errors", async () => {

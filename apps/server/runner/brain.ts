@@ -1075,6 +1075,8 @@ export interface ClaudeLaunch {
    * no Claude in Chrome (its setup adds its tools to the allowed ones).
    */
   noSlashCommands?: boolean;
+  /** `--chrome`: Claude in Chrome, the owner's own browser (`ownerSettings` turns only). */
+  chrome?: boolean;
 }
 
 /**
@@ -1238,6 +1240,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
     ...(l.noSlashCommands ? ["--disable-slash-commands", "--no-chrome"] : []),
+    ...(l.chrome ? ["--chrome"] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -3363,6 +3366,9 @@ export class BrainManager {
       ...(addDirs.length ? { addDirs } : {}),
       ...(plugin ? { pluginDirs: [plugin] } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+      ...(mode === "work" && req.personalMcp === true && !delegated && this.opts.ownerSettings?.()
+        ? { chrome: true }
+        : {}),
     });
     // Claimed before it starts: a CLI that dies in its first turn still left a transcript that is this agent's.
     if (delegated && !resume) claimSession(delegated.room, session, ctx.agent.id, String(req.account));
